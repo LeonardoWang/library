@@ -1,5 +1,7 @@
 __pycache__/
-classes.dex
+log/
 dex.py
-instruments.txt
 libdex.so
+nohup.out
+*.apk
+*.dex
