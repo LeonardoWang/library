@@ -22,8 +22,10 @@ def _extract_dex(apk_path):
     return ret
 
 
-def analyze_dex(dex_path):
-    tree = PackageTree(Dex(dex_path))
+def analyze_dex(dex):
+    if type(dex) is str:
+        dex = Dex(dex)
+    tree = PackageTree(dex)
     return tree.match_libs()
 
 
@@ -35,11 +37,14 @@ def analyze_apk(apk_path):
 
 
 def analyze(target):
-    assert target.endswith('.dex') or target.endswith('.apk')
-    if target.endswith('.dex'):
-        return analyze_dex(target)
+    if type(target) is str:
+        assert target.endswith('.dex') or target.endswith('.apk')
+        if target.endswith('.dex'):
+            return analyze_dex(target)
+        else:
+            return analyze_apk(target)
     else:
-        return analyze_apk(target)
+        return analyze_dex(target)
 
 
 if __name__ == '__main__':
