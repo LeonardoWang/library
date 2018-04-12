@@ -47,5 +47,6 @@ if __name__ == '__main__':
         target = 'classes.dex'
     else:
         target = sys.argv[1]
-    print(lx.json(analyze(target), pretty = True))
+    result = analyze(target)
+    print(lx.json(result, pretty = True))
     lx.clear_temp_file()

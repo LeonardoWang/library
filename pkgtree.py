@@ -145,6 +145,7 @@ class _TreeNode:
             assert weight <= self.weight
             if weight >= self.weight * LibMatchThreshold:
                 ret[self.tag] = pkg
+                #print(self.tag, pkg, self.weight, self.hash.hex())
             if weight == self.weight:
                 return ret
 
