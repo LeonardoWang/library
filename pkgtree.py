@@ -73,7 +73,7 @@ class _TreeNode:
         else:  # leaf (class)
             self.children = None
 
-        self.match_libs = None
+        self.match_libs = { }
 
 
     ##  insert a leaf to the tree; create missing nodes on the path to that leaf and set their tag
@@ -123,7 +123,7 @@ class _TreeNode:
 
     ##  search partially matched libraries in this node and its children
     def match_potential_libs(self):
-        if self.match_libs is not None or self.children is None: return
+        if len(self.match_libs) > 0 or self.children is None: return
 
         self.match_libs = defaultdict(int)
         for c in self.children.values():
@@ -142,10 +142,14 @@ class _TreeNode:
 
         if len(self.match_libs) > 0:
             pkg, weight = max(self.match_libs.items(), key = operator.itemgetter(1))
-            if self.match_libs.get(self.tag, 0) >= weight:
+            pkgs = [ p for p, w in self.match_libs.items() if w == weight ]
+            if self.tag in pkgs:
                 pkg = self.tag
+            elif len(pkgs) > weight:
+                return ret  # small feature size and too many potential package names, not a lib
             if weight >= self.weight * LibMatchThreshold:
                 ret[self.tag] = pkg
+                #print(self.tag, pkg, self.hash.hex())
             if weight == self.weight:
                 return ret
 

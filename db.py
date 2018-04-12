@@ -23,5 +23,5 @@ def get_clustered_libs():
     return lx.query('library', sql, MinLibCount)
 
 def insert_lib(sha256, pkg_name):
-    sql = 'insert into lib (sha256, pkg_name) values (%s,%s,%s)'
+    sql = 'insert ignore into lib (sha256, pkg_name) values (%s,%s)'
     lx.commit('library', sql, (sha256, pkg_name))
