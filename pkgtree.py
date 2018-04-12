@@ -73,7 +73,7 @@ class _TreeNode:
         else:  # leaf (class)
             self.children = None
 
-        self.match_libs = { }
+        self.match_libs = None
 
 
     ##  insert a leaf to the tree; create missing nodes on the path to that leaf and set their tag
@@ -142,10 +142,10 @@ class _TreeNode:
 
         if len(self.match_libs) > 0:
             pkg, weight = max(self.match_libs.items(), key = operator.itemgetter(1))
-            assert weight <= self.weight
+            if self.match_libs.get(self.tag, 0) >= weight:
+                pkg = self.tag
             if weight >= self.weight * LibMatchThreshold:
                 ret[self.tag] = pkg
-                #print(self.tag, pkg, self.weight, self.hash.hex())
             if weight == self.weight:
                 return ret
 
