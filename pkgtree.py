@@ -106,8 +106,8 @@ class _TreeNode:
     def cluster(self):
         if self.weight < db.MinWeight: return
         db.add_pkg(self.hash, self.weight, self.tag)
-        for c in self.children.values():
-            if c.children is not None:
+        if self.children is not None:
+            for c in self.children.values():
                 c.cluster()
 
 
@@ -119,6 +119,9 @@ class _TreeNode:
         elif self.children is not None:
             for c in self.children.values():
                 c.match_perfect_libs()
+
+        #if self.tag.startswith('Ldebug/'):
+        #    print(self.hash.hex(), self.tag, self.weight, self.match_libs)
 
 
     ##  search partially matched libraries in this node and its children
@@ -135,6 +138,9 @@ class _TreeNode:
             for pkg, weight in child_match.items():
                 self.match_libs[pkg] += weight
 
+        #if self.tag.startswith('Ldebug/'):
+        #    print(self.hash.hex(), self.tag, self.weight, self.match_libs)
+
 
     ##  get all matched libraries
     def get_all_libs(self):
@@ -149,7 +155,7 @@ class _TreeNode:
                 return ret  # small feature size and too many potential package names, not a lib
             if weight >= self.weight * LibMatchThreshold:
                 ret[self.tag] = pkg
-                #print(self.tag, pkg, self.hash.hex())
+                #print(self.tag, pkg, weight, self.weight, self.hash.hex())
             if weight == self.weight:
                 return ret
 

@@ -64,6 +64,11 @@ def commit(db, sql, args):
     db.cursor().execute(sql, args)
     db.commit()
 
+def commit_multi(db, sql, args):
+    db = connect_db(db)
+    db.cursor().executemany(sql, args)
+    db.commit()
+
 
 ## Aliyun OSS
 

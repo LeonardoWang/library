@@ -1,7 +1,7 @@
 import lx
 
 MinWeight = 3
-MinLibCount = 5
+MinLibCount = 10
 
 pkg_name_black_list = [ 'Lcn', 'Lcom', 'Lorg' ]
 
@@ -22,6 +22,6 @@ def get_clustered_libs():
     sql = 'select sha256, pkg_name, weight from cluster where count >= %s'
     return lx.query('library', sql, MinLibCount)
 
-def insert_lib(sha256, pkg_name):
+def insert_libs(libs):
     sql = 'insert ignore into lib (sha256, pkg_name) values (%s,%s)'
-    lx.commit('library', sql, (sha256, pkg_name))
+    lx.commit_multi('library', sql, libs)
