@@ -8,9 +8,9 @@ pkg_name_black_list = [ 'Lcn', 'Lcom', 'Lorg' ]
 def load_api_list():
     return set( l.split(',', 1)[0] for l in lx.open_res_file(__file__, 'strict_api.csv') )
 
-def get_lib_names(sha256):
-    sql = 'select pkg_name from lib where sha256 = %s'
-    return lx.query('library', sql, sha256, multi = True)
+def match_libs(hash_list):
+    sql = 'select sha256, pkg_name from lib where sha256 in ({ARGS})'
+    return lx.query_multi('library', sql, (), hash_list)
 
 def add_pkg(sha256, weight, name):
     if len(name) <= 2 or name in pkg_name_black_list: return

@@ -46,27 +46,35 @@ def query(db, sql, args = None, multi = False):
         cursor.execute(sql)
     else:
         cursor.execute(sql, args)
-    ret = [ ]
-    while True:
-        record = cursor.fetchone()
-        if record is None: break
-        if len(record) == 1:
-            ret.append(record[0])
-        else:
-            ret.append(record)
-    if multi: return ret
-    if len(ret) == 0: return None
-    if len(ret) == 1: return ret[0]
+    ret = cursor.fetchall()
+    if len(ret) == 0: return [ ] if multi else None
+    if len(ret[0]) == 1:
+        ret = [ row[0] for row in ret ]
+    if len(ret) == 1 and not multi: return ret[0]
     return ret
+
+def query_multi(db, sql, args, arg_list):
+    assert '%s' not in sql.split('{ARGS}', 1)[1]
+    arg_list = list(arg_list)
+    args = list(args) + arg_list
+    sql = sql.format(ARGS = ','.join('%s' for a in arg_list))
+    cursor = connect_db(db).cursor()
+    cursor.execute(sql, args)
+    ret = cursor.fetchall()
+    if len(ret) == 0: return ret
+    if len(ret[0]) == 1:
+        return [ row[0] for row in ret ]
+    else:
+        return ret
 
 def commit(db, sql, args):
     db = connect_db(db)
     db.cursor().execute(sql, args)
     db.commit()
 
-def commit_multi(db, sql, args):
+def commit_multi(db, sql, arg_list):
     db = connect_db(db)
-    db.cursor().executemany(sql, args)
+    db.cursor().executemany(sql, arg_list)
     db.commit()
 
 
