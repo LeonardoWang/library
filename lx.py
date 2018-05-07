@@ -40,6 +40,9 @@ def connect_db(db = 'main', user = 'dev', password = 'Oslab1435go'):
         )
     return _conns[db]
 
+def reconnect_db():
+    _conns.clear()
+
 def query(db, sql, args = None, multi = False):
     cursor = connect_db(db).cursor()
     if args is None:
@@ -53,13 +56,11 @@ def query(db, sql, args = None, multi = False):
     if len(ret) == 1 and not multi: return ret[0]
     return ret
 
-def query_multi(db, sql, args, arg_list):
-    assert '%s' not in sql.split('{ARGS}', 1)[1]
-    arg_list = list(arg_list)
-    args = list(args) + arg_list
+def query_multi(db, sql, arg_list):
+    assert '{ARGS}' in sql and '%s' not in sql
     sql = sql.format(ARGS = ','.join('%s' for a in arg_list))
     cursor = connect_db(db).cursor()
-    cursor.execute(sql, args)
+    cursor.execute(sql, arg_list)
     ret = cursor.fetchall()
     if len(ret) == 0: return ret
     if len(ret[0]) == 1:
@@ -107,6 +108,14 @@ def oss_download_apk(pkg, md5, sha256):
         sha256 = sha256.hex()
     key = pkg + '/' + md5 + '-' + sha256 + '.apk'
     return oss_download(key)
+
+def oss_download_dex(pkg, md5):
+    if type(md5) is bytes: md5 = md5.hex()
+    key = pkg + '/' + md5 + '/dex.zip'
+    return oss_download(key)
+
+def oss_get_size(key, bucket = 'lxapk'):
+    return oss(bucket).get_object_meta(key).content_length
 
 
 ##  local resource file

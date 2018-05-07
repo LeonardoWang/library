@@ -1,22 +1,13 @@
-import db
-
 from collections import defaultdict
 import hashlib
 import operator
 
 
-LibMatchThreshold = 0.9
-
-
-##  `set` of all API functions
-_api_list = db.load_api_list()
-
-
-def _get_invoked_apis(class_):
+def _get_invoked_apis(class_, api_set):
     ret = [ ]
     for method in class_.methods():
         for invoked_method in method.get_invoked_methods_libradar():
-            if invoked_method in _api_list:
+            if invoked_method in api_set:
                 ret.append(invoked_method)
     return ret
 
@@ -31,16 +22,16 @@ def _calc_hash(lst):
 
 
 class PackageTree:
-    def __init__(self, dex):
+    def __init__(self, dex, api_set):
         # create an empty tree
         self.root = _TreeNode('')
-        self.root.tag = ''  # otherwise root.tag will be 'L'
+        self.root.name = ''  # otherwise root.name will be 'L'
 
         # create tree nodes
         for class_ in dex.classes:
             name = class_.name()
             assert name.startswith('L')
-            apis = _get_invoked_apis(class_)
+            apis = _get_invoked_apis(class_, api_set)
             if len(apis) == 0: continue
             leaf = _TreeNode(name, _calc_hash(apis), len(apis))
             self.root.add_leaf(leaf)
@@ -48,29 +39,25 @@ class PackageTree:
         # calculate hash and weight
         self.nodes = { node.hash : node for node in self.root.finish() }
 
-    ##  insert the tree into clustering database
-    def cluster(self):
-        self.root.cluster()
 
     ##  calculate match rate of potential libraries
-    def match_libs(self):
-        libs = db.match_libs(self.nodes.keys())
+    #   @param  perfect_libs    perfectly matched libraries
+    def detect_libs(self, perfect_libs, match_rate_threshold):
         for hash_, pkg in libs:
             node = self.nodes[hash_]
             node.match_libs[pkg] = node.weight
         self.root.match_potential_libs()
-        return self.root.get_all_libs()
+        return self.root.get_all_libs(match_rate_threshold)
 
 
 ##  each tree node represents a package or a class
 class _TreeNode:
-    def __init__(self, tag, hash_ = None, weight = None):
-        self.tag = 'L' + tag[1:]    ## the package name (or full class name)
+    def __init__(self, name, hash_ = None, weight = None):
+        self.name = 'L' + name[1:]  ## the package name (or full class name)
         self.hash = hash_           ## sha256 of children's hash (for package) or of invoked APIs' name (for class)
         self.weight = weight        ## number of API calls in this package
 
         self.parent = None
-
         if hash_ is None:  # not leaf (package)
             self.children = { }
         else:  # leaf (class)
@@ -79,22 +66,22 @@ class _TreeNode:
         self.match_libs = { }
 
 
-    ##  insert a leaf to the tree; create missing nodes on the path to that leaf and set their tag
+    ##  insert a leaf to the tree; create missing nodes on the path to that leaf and set their name
     def add_leaf(self, node):
-        assert node.tag.startswith(self.tag)
-        assert node.tag != self.tag  # class name must be unique
+        assert node.name.startswith(self.name)
+        assert node.name != self.name  # class name must be unique
 
-        suffix = node.tag[ len(self.tag) + 1 : ]
-        next_tag = suffix.split('/', 1)[0]
+        suffix = node.name[ len(self.name) + 1 : ]
+        next_name = suffix.split('/', 1)[0]
 
         if '/' in suffix:  # inner package exist
-            if next_tag not in self.children:
-                self.children[next_tag] = _TreeNode(self.tag + '/' + next_tag)
-            self.children[next_tag].add_leaf(node)
-            self.children[next_tag].parent = self
+            if next_name not in self.children:
+                self.children[next_name] = _TreeNode(self.name + '/' + next_name)
+            self.children[next_name].add_leaf(node)
+            self.children[next_name].parent = self
 
         else:  # self is last layer
-            self.children[next_tag] = node
+            self.children[next_name] = node
 
 
     ##  calculate the hash of every node
@@ -108,14 +95,6 @@ class _TreeNode:
         self.hash = _calc_hash([ c.hash for c in self.children.values() ])
         self.weight = sum( c.weight for c in self.children.values() )
         return [ self ] + children_nodes
-
-
-    def cluster(self):
-        if self.weight < db.MinWeight: return
-        db.add_pkg(self.hash, self.weight, self.tag)
-        if self.children is not None:
-            for c in self.children.values():
-                c.cluster()
 
 
     ##  search partially matched libraries in this node and its children
@@ -132,12 +111,12 @@ class _TreeNode:
             for pkg, weight in child_match.items():
                 self.match_libs[pkg] += weight
 
-        #if self.tag.startswith('Ldebug'):
-        #    print(self.hash.hex(), self.tag, self.weight, self.match_libs)
+        #if self.name.startswith('Ldebug'):
+        #    print(self.hash.hex(), self.name, self.weight, self.match_libs)
 
 
     ##  get all matched libraries
-    def get_all_libs(self):
+    def get_all_libs(self, match_rate_threshold):
         if self.children is None: return { }    # assume libs are always packages instead of classes
 
         ret = { }
@@ -145,20 +124,20 @@ class _TreeNode:
         if len(self.match_libs) > 0:
             pkg, weight = max(self.match_libs.items(), key = operator.itemgetter(1))
             pkgs = [ p for p, w in self.match_libs.items() if w == weight ]
-            if self.tag in pkgs:
-                pkg = self.tag
+            if self.name in pkgs:
+                pkg = self.name
             elif len(pkgs) > weight:
                 return ret  # small feature size and too many potential package names, not a lib
-            if weight >= self.weight * LibMatchThreshold:
-                ret[self.tag] = pkg
-                #print(self.tag, pkg, weight, self.weight, self.hash.hex())
+            if weight >= self.weight * match_rate_threshold:
+                ret[self.name] = pkg
+                #print(self.name, pkg, weight, self.weight, self.hash.hex())
             if weight == self.weight:
                 return ret
 
         if self.children is None: return ret
 
         # add children's result to `ret` iff it's not a subpackage of self's matching lib
-        lib = ret[self.tag] if self.tag in ret else None
+        lib = ret[self.name] if self.name in ret else None
         for c in self.children.values():
             for cpkg, clib in c.get_all_libs().items():
                 if lib is None or not clib.startswith(lib):

@@ -1,6 +1,5 @@
 import lx
-from dex import Dex
-from pkgtree import PackageTree
+import libdetect
 
 import sys
 from zipfile import ZipFile
@@ -23,16 +22,15 @@ def _extract_dex(apk_path):
 
 
 def main(begin, end):
-    sql = 'select app_id, app.pkg, md5, sha256 from app join apk using(apk_id) where apk_id is not null and %s<=app_id and app_id<%s'
+    sql = 'select app_id, app.pkg, md5 from app join apk using(apk_id) where apk_id is not null and %s<=app_id and app_id<%s'
     apks = lx.query('main', sql, (begin, end))
     for apk_info in apks:
-        app_id, pkg, md5, sha256 = apk_info
+        app_id, pkg, md5 = apk_info
         lx.info('%d %s' % (app_id, pkg))
         try:
-            apk_path = lx.oss_download_apk(pkg, md5, sha256)
+            apk_path = lx.oss_download_dex(pkg, md5, sha256)
             for dex in _extract_dex(apk_path):
-                tree = PackageTree(Dex(dex))
-                tree.cluster()
+                libdetect.add_dex_to_database(dex)
             lx.clear_temp_file()
         except Exception as e:
             lx.warning(e)
