@@ -6,14 +6,14 @@ import operator
 def _get_invoked_apis(class_, api_set):
     ret = [ ]
     for method in class_.methods():
-        for invoked_method in method.get_invoked_methods_libradar():
+        for invoked_method in method.get_invoked_methods():
             if invoked_method in api_set:
                 ret.append(invoked_method)
     return ret
 
 
 def _calc_hash(lst):
-    ret = hashlib.sha256()
+    ret = hashlib.sha1()
     for s in sorted(lst):
         if type(s) is str:
             s = s.encode('utf8')

@@ -1,5 +1,6 @@
 import pymysql
 import oss2
+import oss2.exceptions
 
 from datetime import datetime
 from json import dumps
@@ -98,7 +99,10 @@ def oss_upload(local, remote, bucket = 'lxapk'):
 def oss_download(remote, local = None, bucket = 'lxapk'):
     if local is None:
         local, f = create_temp_file()
-    oss(bucket).get_object_to_file(remote, local)
+    try:
+        oss(bucket).get_object_to_file(remote, local)
+    except oss2.exceptions.NoSuchKey:
+        return None
     return local
 
 def oss_download_apk(pkg, md5, sha256):
@@ -112,7 +116,7 @@ def oss_download_apk(pkg, md5, sha256):
 def oss_download_dex(pkg, md5):
     if type(md5) is bytes: md5 = md5.hex()
     key = pkg + '/' + md5 + '/dex.zip'
-    return oss_download(key)
+    return oss_download(key, bucket = 'lxzip')
 
 def oss_get_size(key, bucket = 'lxapk'):
     return oss(bucket).get_object_meta(key).content_length

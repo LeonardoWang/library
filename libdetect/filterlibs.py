@@ -1,8 +1,5 @@
 import lx
 
-import db
-import thresholds
-
 
 # Check if package name `n1` is "better than" and can replace `n2`
 def _name_better(n1, n2):
@@ -21,7 +18,7 @@ def _name_better(n1, n2):
     return True
 
 
-def main(db = db, thresholds = thresholds):
+def main(db, thresholds):
     lx.verbose('Loading packages database...')
 
     names_by_hash = defaultdict(set)
@@ -55,7 +52,3 @@ def main(db = db, thresholds = thresholds):
     db.add_libs(libs)
 
     lx.verbose('Done')
-
-
-if __name__ == '__main__':
-    main()

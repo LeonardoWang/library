@@ -1,4 +1,6 @@
 import lx
+from dex import Dex
+
 import libdetect
 
 import sys
@@ -28,14 +30,18 @@ def main(begin, end):
         app_id, pkg, md5 = apk_info
         lx.info('%d %s' % (app_id, pkg))
         try:
-            apk_path = lx.oss_download_dex(pkg, md5, sha256)
+            apk_path = lx.oss_download_dex(pkg, md5)
+            if apk_path is None:
+                lx.info('    404')
+                continue
             for dex in _extract_dex(apk_path):
-                libdetect.add_dex_to_database(dex)
+                libdetect.add_dex_to_database(Dex(dex))
             lx.clear_temp_file()
+
+            sql = 'insert ignore into apks (pkg, md5) values (%s,%s)'
+            lx.commit('library', sql, (pkg, md5))
         except Exception as e:
             lx.warning(e)
-        sql = 'insert ignore into apks (pkg, md5) values (%s,%s)'
-        lx.commit('library', sql, (pkg, md5))
 
 
 if __name__ == '__main__':
