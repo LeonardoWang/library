@@ -31,4 +31,4 @@ def _get_pkgs(dex, db = db, thresholds = thresholds):
 
 
 def update_library_database(db = db, thresholds = thresholds):
-    filterlibs.main()
+    filterlibs.main(db, thresholds)

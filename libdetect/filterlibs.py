@@ -1,5 +1,7 @@
 import lx
 
+from collections import defaultdict
+
 
 # Check if package name `n1` is "better than" and can replace `n2`
 def _name_better(n1, n2):
@@ -22,7 +24,7 @@ def main(db, thresholds):
     lx.verbose('Loading packages database...')
 
     names_by_hash = defaultdict(set)
-    for hash_, pkg_name, weight in db.get_all_pkgs(thresholds.MinLibCnt):
+    for hash_, pkg_name, weight in db.get_all_pkgs(thresholds.MinLibCount):
         names_by_hash[hash_].add(pkg_name)
 
     lx.verbose('Trimming package names...')

@@ -41,9 +41,9 @@ class PackageTree:
 
 
     ##  calculate match rate of potential libraries
-    #   @param  perfect_libs    perfectly matched libraries
-    def detect_libs(self, perfect_libs, match_rate_threshold):
-        for hash_, pkg in libs:
+    #   @param  exact_libs    exactly matched libraries
+    def detect_libs(self, exact_libs, match_rate_threshold):
+        for hash_, pkg in exact_libs:
             node = self.nodes[hash_]
             node.match_libs[pkg] = node.weight
         self.root.match_potential_libs()
@@ -139,7 +139,9 @@ class _TreeNode:
         # add children's result to `ret` iff it's not a subpackage of self's matching lib
         lib = ret[self.name] if self.name in ret else None
         for c in self.children.values():
-            for cpkg, clib in c.get_all_libs().items():
-                if lib is None or not clib.startswith(lib):
-                    ret[cpkg] = clib
+            if c.children is None: continue # ignore classes, only record packages
+            for cpkg, clib in c.get_all_libs(match_rate_threshold).items():
+                #if lib is None or not clib.startswith(lib):
+                #    ret[cpkg] = clib
+                ret[cpkg] = clib
         return ret

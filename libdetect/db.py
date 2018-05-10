@@ -5,7 +5,20 @@ api_set = set( l.split(',', 1)[0] for l in lx.open_res_file(__file__, 'strict_ap
 
 def match_libs(hash_list):
     sql = 'select hash, pkg_name from libraries where hash in ({ARGS})'
-    return lx.query_multi('library', sql, hash_list)
+    return lx.query_multi('library', sql, list(hash_list))
+
+#from collections import defaultdict
+#
+#_libs = defaultdict(list)
+#for hash_, pkg in lx.query('library', 'select hash, pkg_name from libraries'):
+#    _libs[hash_].append(pkg)
+#
+#def match_libs(hash_list):
+#    ret = [ ]
+#    for hash_ in hash_list:
+#        for pkg in _libs[hash_]:
+#            ret.append( (hash_, pkg) )
+#    return ret
 
 def add_pkgs(pkgs):
     sql = 'insert into packages (hash, pkg_name, weight, count) values (%s,%s,%s,1)' + \
