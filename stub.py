@@ -10,6 +10,12 @@ class LibInfo(NamedTuple):
     hash: bytes
     name: str
 
+class PkgResult(NamedTuple):
+    hash: bytes
+    name: str
+    lib_name: str
+    similarity: Optional[float]
+
 class Thresholds(NamedTuple):
     LibMatchRate: float
     MinApiWeight: int
@@ -19,6 +25,12 @@ class Thresholds(NamedTuple):
 
 class Database:
     api_set: Set[str]
+    lib_set: Set[str]
+
+    @staticmethod
+    def preload() -> None:
+        """Download library database to memory for better performance"""
+        raise NotImplementedError()
 
     @staticmethod
     def match_libs(hash_list: Iterable[bytes]) -> List[LibInfo]:

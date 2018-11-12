@@ -2,24 +2,26 @@ from common import *
 
 from .stub import *
 
+from contextlib import suppress
 import os
 
 
 # hash -> pkg_name -> count
 _db_pkgs: Dict[bytes, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-# hash -> pkg_name -> count
-_db_libs: Dict[bytes, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+# hash -> pkg_name's
+_db_libs: Dict[bytes, Set[str]] = defaultdict(set)
 # hash -> weight
 _db_weight: Dict[bytes, int] = { }
 
 
 api_set: Set[str] = set(lx.read_lines(lx.open_resource('apis.txt')))
+lib_set: Set[str] = set(lx.read_lines(lx.open_resource('libs.txt')))
 
 def match_libs(hash_list: Iterable[bytes]) -> List[LibInfo]:
     ret = [ ]
     for hash_ in hash_list:
-        for pkg in _db_libs[hash_].keys():
-            ret.append(LibInfo._make( (hash_, pkg) ))
+        for pkg in _db_libs[hash_]:
+            ret.append(LibInfo(hash_, pkg))
     return ret
 
 def add_pkgs(pkgs: List[PkgInfo]) -> None:
@@ -42,8 +44,11 @@ def get_pkgs(threshold: int) -> List[PkgInfo]:
 
 def add_libs(libs: List[LibInfo]) -> None:
     for lib in libs:
-        _db_libs[lib.hash][lib.name] += 1
+        _db_libs[lib.hash].add(lib.name)
 
+
+def preload() -> None:
+    lx.warning('Trying to pre-download memory database')
 
 def dump() -> None:
     with open('db_pkgs.txt', 'w') as f:
@@ -51,27 +56,23 @@ def dump() -> None:
             for pkg, cnt in pkg_cnt.items():
                 f.write('%s %s %d\n' % (hash_.hex(), pkg, cnt))
     with open('db_libs.txt', 'w') as f:
-        for hash_, pkg_cnt in _db_libs.items():
-            for pkg, cnt in pkg_cnt.items():
-                f.write('%s %s %d\n' % (hash_.hex(), pkg, cnt))
+        for hash_, pkgs in _db_libs.items():
+            for pkg in sorted(pkgs):
+                f.write('%s %s\n' % (hash_.hex(), pkg))
     with open('db_weights.txt', 'w') as f:
         for hash_, weight in _db_weight.items():
             f.write('%s %d\n' % (hash_.hex(), weight))
 
 def load() -> None:
-    _db_exists = False
-    try:
+    with suppress(FileNotFoundError):
         for line in lx.read_lines('db_pkgs.txt'):
-            _db_exists = True
             hash_, pkg, cnt = line.split(' ')
-            _db_pkgs[bytes.fromhex(hash_)][pkg] += int(cnt)
+            _db_pkgs[bytes.fromhex(hash_)][pkg] = int(cnt)
+    with suppress(FileNotFoundError):
         for line in lx.read_lines('db_libs.txt'):
-            _db_exists = True
-            hash_, pkg, cnt = line.split(' ')
-            _db_libs[bytes.fromhex(hash_)][pkg] += int(cnt)
+            hash_, pkg = line.split(' ')
+            _db_libs[bytes.fromhex(hash_)].add(pkg)
+    with suppress(FileNotFoundError):
         for line in lx.read_lines('db_weights.txt'):
-            _db_exists = True
             hash_, weight = line.split(' ')
             _db_weight[bytes.fromhex(hash_)] = int(weight)
-    except FileNotFoundError:
-        assert not _db_exists

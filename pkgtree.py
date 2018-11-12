@@ -44,29 +44,55 @@ class PackageTree:
         self.nodes: Dict[bytes, _TreeNode] = { cast(bytes, node.hash) : node for node in self.root.finish() }
 
 
-    def detect_libs(self, exact_libs: List[LibInfo], match_rate_threshold: float,
-            include_subpkgs: bool) -> Dict[str, str]:
+    def set_db_match_result(self, exact_libs: List[LibInfo]):
+        for lib in exact_libs:
+            node = self.nodes[lib.hash]
+            node.match_libs[lib.name] = cast(int, node.weight)
+
+
+    def detect_libs(self, match_rate_threshold: float, whitelist: Set[str]) -> List[PkgResult]:
         """Calculate match rate of potential libraries, return matches above threshold
         exact_libs: list of perfectly matched libraries
         """
-        for lib in exact_libs:
-            node = self.nodes[lib.hash]
-            node.match_libs[lib.name] = cast(int, node.weight)
         self.root.calc_match_rate()
-        return self.root.get_libs(match_rate_threshold, include_subpkgs)
+        self.root.gen_result(whitelist)
+
+        ret = [ ]
+
+        for node in self.nodes.values():
+            if node.result_match_name is None:
+                similarity = None
+            else:
+                similarity = cast(int, node.result_match_weight) / cast(int, node.weight)
+
+            if similarity is not None and similarity >= match_rate_threshold:
+                ret.append(PkgResult(
+                    hash = cast(bytes, node.hash),
+                    name = node.name,
+                    lib_name = cast(str, node.result_match_name),
+                    similarity = similarity
+                ))
+            elif node.name.lower() in whitelist:
+                if node.result_match_name != node.name:
+                    similarity = None
+                ret.append(PkgResult(
+                    hash = cast(bytes, node.hash),
+                    name = node.name,
+                    lib_name = node.name,
+                    similarity = similarity
+                ))
+
+        return ret
 
 
-    def detect_exact_libs(self, exact_libs: List[LibInfo]) -> Dict[str, str]:
+    def detect_exact_libs(self) -> Dict[str, str]:
         """Get perfectly matched libraries, excluding subpackages"""
-        for lib in exact_libs:
-            node = self.nodes[lib.hash]
-            node.match_libs[lib.name] = cast(int, node.weight)
         return self.root.get_exact_libs()
 
 
 
 class _TreeNode:
-    def __init__(self, name: str, hash_: Optional[bytes] = None, weight: Optional[int] = None) -> None:
+    def __init__(self, name: str, hash_: bytes = None, weight: int = None) -> None:
         self.name = 'L' + name[1:]  ## the package name (or full class name)
         self.hash = hash_
         self.weight = weight
@@ -78,6 +104,9 @@ class _TreeNode:
 
         # mapping from potential library name to matched API weight
         self.match_libs: Dict[str, int] = defaultdict(int)
+
+        self.result_match_name: Optional[str] = None
+        self.result_match_weight: Optional[int] = None
 
 
     def add_leaf(self, node: _TreeNode) -> None:
@@ -127,6 +156,7 @@ class _TreeNode:
 
         Special case #2:
         If the weight of this node is only 25, then matched weight of 'com.lib' is 25 instead of 30.
+        This may happen when 'com.lib.foo' and 'com.lib.bar' are of different version.
         """
         if len(self.match_libs) > 0 or self.children is None:
             return  # nothing to calculate for perfect matches and leaf nodes
@@ -145,8 +175,44 @@ class _TreeNode:
                 self.match_libs[pkg] = cast(int, self.weight)
 
 
+    def gen_result(self, whitelist: Set[str], parent_perfect = False) -> None:
+        if self.children is None:  # assuming lib is always package instead of class
+            return
+
+        if parent_perfect:  # ignore children of perfectly matched packages unless in whitelist
+            if self.name.lower() in whitelist and self.name in self.match_libs:
+                self.result_match_name = self.name
+                self.result_match_weight = self.match_libs[self.name]
+            perfect = True
+
+        elif len(self.match_libs) > 0:
+            max_weight = max(self.match_libs.values())
+            pkgs = sorted( p for p, w in self.match_libs.items() if w == max_weight )
+
+            if len(pkgs) > max_weight:  # small feature size with too many potential names
+                return  # likely to be false-positive
+
+            if self.name in pkgs:  # this package has the same name of one of best-matched libraries
+                self.result_match_name = self.name
+            else:
+                self.result_match_name = pkgs[0]  # pick a random name
+                for pkg in pkgs:
+                    if pkg.lower() in whitelist:  # one of best-matched libraries is in whitelist
+                        self.result_match_name = pkg
+                        break
+
+            self.result_match_weight = max_weight
+            perfect = (max_weight == self.weight)
+
+        else:
+            perfect = False
+
+        for child in self.children.values():
+            child.gen_result(whitelist, perfect)
+
+
     def get_libs(self, match_rate_threshold: float, include_subpkgs: bool = True) -> Dict[str, str]:
-        """Get all perfectly or partially matched libraries
+        """Get all perfectly or partially matched libraries in the subtree
         Return the mapping from package name in dex to standard library name.
         """
         if self.children is None: return { }  # assuming lib is always package instead of class

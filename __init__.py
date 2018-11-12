@@ -30,6 +30,7 @@ if lx.sql_avail:
 else:
     from . import memdb
     _db = cast(Database, memdb)
+    _db.load()
 
 
 def set_database(db: Any):
@@ -50,16 +51,20 @@ def set_thresholds(thresholds: Thresholds):
         value = getattr(thresholds, key)
         setattr(_thresholds, key, value)
 
+def preload_database():
+    """Pre-download database to memory (for SQL database)"""
+    _db.preload()
 
-def detect_dex_libraries(dex: Dex, include_subpkgs: bool = True) -> Dict[str, str]:
+
+def detect_dex_libraries(dex: Dex) -> List[PkgResult]:
     """Detect third-party libraries in a dex file
     Return the mapping from original package name to standard library name.
     If a package and some of its subpackages match libraries at the same time,
-    `include_subpkgs` parameter will decide whether or not to report subpackages.
     """
     tree = PackageTree(dex, _db.api_set)
     libs = _db.match_libs(tree.nodes.keys())
-    return tree.detect_libs(libs, _thresholds.LibMatchRate, include_subpkgs)
+    tree.set_db_match_result(libs)
+    return tree.detect_libs(_thresholds.LibMatchRate, _db.lib_set)
 
 def detect_exact_dex_libraries(dex: Dex) -> Dict[str, str]:
     """Detect perfectly matched third-party libraries in a dex file
@@ -69,17 +74,18 @@ def detect_exact_dex_libraries(dex: Dex) -> Dict[str, str]:
     """
     tree = PackageTree(dex, _db.api_set)
     libs = _db.match_libs(tree.nodes.keys())
-    return tree.detect_exact_libs(libs)
+    tree.set_db_match_result(libs)
+    return tree.detect_exact_libs()
 
 
-def detect_apk_libraries(apk_file: Union[bytes, str], include_subpkgs: bool = True) -> Dict[str, str]:
+def detect_apk_libraries(apk_file: Union[bytes, str]) -> List[PkgResult]:
     """Detect third-party libraries in an APK file
     This is a wrapper of `detect_dex_libraries`
     For performance consideration, only use this function if there is no other analyzers
     """
-    ret = { }
+    ret: List[PkgResult] = [ ]
     for dex in Apk(apk_file):
-        ret.update(detect_dex_libraries(dex, include_subpkgs))
+        ret += detect_dex_libraries(dex)
     return ret
 
 def detect_exact_apk_libraries(apk_file: Union[bytes, str]) -> Dict[str, str]:

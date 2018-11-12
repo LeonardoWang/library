@@ -6,11 +6,21 @@ import os
 
 
 api_set: Set[str] = set(lx.read_lines(lx.open_resource('apis.txt')))
+lib_set: Set[str] = set(lx.read_lines(lx.open_resource('libs.txt')))
+
+
+# hash -> pkg_name
+_db: Optional[Dict[bytes, str]] = None
+
 
 def match_libs(hash_list: Iterable[bytes]) -> List[LibInfo]:
     """Find all perfectly matched libraries for a list of package hashs"""
-    sql = 'select hash, pkg_name from libraries where hash in {ARGS}'
-    return lx.query('library', sql, hash_list)
+    if _db is None:
+        sql = 'select hash, pkg_name from libraries where hash in {ARGS}'
+        result = lx.query('library', sql, hash_list)
+    else:
+        result = [ (h, _db[h]) for h in hash_list if h in _db ]
+    return [ LibInfo(*record) for record in result ]
 
 def add_pkgs(pkgs: List[PkgInfo]) -> None:
     """Add a package to package database"""
@@ -34,8 +44,14 @@ def add_libs(libs: List[LibInfo]) -> None:
     lx.commit_multi('library', sql, libs)
 
 
+def preload() -> None:
+    """Download library database to memory for better performance"""
+    global _db
+    sql = 'select hash, pkg_name from libraries'
+    _db = { hash_: pkg for hash_, pkg in lx.query('library', sql) }
+
 def dump() -> None:
-    raise RuntimeError('Trying to dump SQL database')
+    lx.warning('Trying to dump SQL database')
 
 def load() -> None:
-    raise RuntimeError('Trying to load SQL database')
+    lx.warning('Trying to load SQL database')
