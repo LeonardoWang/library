@@ -24,7 +24,7 @@ from . import filterlibs
 from . import thresholds as _thresholds
 
 _db: Database
-if lx.sql_avail:
+if False:
     from . import sqldb
     _db = cast(Database, sqldb)
 else:
